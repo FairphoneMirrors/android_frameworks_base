@@ -20,13 +20,10 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IIntentReceiver;
 import android.content.IIntentSender;
 import android.content.IntentSender;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.Handler;
@@ -34,9 +31,7 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
-import android.os.ServiceManager;
 import android.util.AndroidException;
-import android.util.Log;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -287,7 +282,6 @@ public final class PendingIntent implements Parcelable {
      */
     public static PendingIntent getActivity(Context context, int requestCode,
             @NonNull Intent intent, @Flags int flags, @Nullable Bundle options) {
-
         String packageName = context.getPackageName();
         String resolvedType = intent != null ? intent.resolveTypeIfNeeded(
                 context.getContentResolver()) : null;
@@ -431,9 +425,9 @@ public final class PendingIntent implements Parcelable {
         String packageName = context.getPackageName();
         String[] resolvedTypes = new String[intents.length];
         for (int i=0; i<intents.length; i++) {
-            resolvedTypes[i] = intents[i].resolveTypeIfNeeded(context.getContentResolver());
             intents[i].migrateExtraStreamToClipData();
             intents[i].prepareToLeaveProcess();
+            resolvedTypes[i] = intents[i].resolveTypeIfNeeded(context.getContentResolver());
         }
         try {
             IIntentSender target =
@@ -457,9 +451,9 @@ public final class PendingIntent implements Parcelable {
         String packageName = context.getPackageName();
         String[] resolvedTypes = new String[intents.length];
         for (int i=0; i<intents.length; i++) {
-            resolvedTypes[i] = intents[i].resolveTypeIfNeeded(context.getContentResolver());
             intents[i].migrateExtraStreamToClipData();
             intents[i].prepareToLeaveProcess();
+            resolvedTypes[i] = intents[i].resolveTypeIfNeeded(context.getContentResolver());
         }
         try {
             IIntentSender target =

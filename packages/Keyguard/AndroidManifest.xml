@@ -46,10 +46,5 @@
         android:persistent="true"
         android:supportsRtl="true">
 
-        <service
-            android:name="com.android.keyguard.ClockScreenService"
-            android:enabled="true"
-            android:exported="false" >
-        </service>
     </application>
 </manifest>

@@ -46,7 +46,6 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.StrictMode;
 import android.service.voice.IVoiceInteractionSession;
-import android.os.IPrivacyImpactService;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
@@ -2403,34 +2402,6 @@ class ActivityManagerProxy implements IActivityManager
         return mRemote;
     }
 
-    private static final String PRIVACY_IMPACT_PACKAGE = "com.fairphone.privacyimpact";
-    private static final String PRIVACY_IMPACT_ACTIVITY = "com.fairphone.privacyimpact.GrantAccessActivity";
-
-    private static Intent wrapPrivacyImpact(Intent intent, Bundle options, int requestCode){
-        Intent newIntent = intent;
-        try {
-            IPrivacyImpactService pis = IPrivacyImpactService.Stub.asInterface(ServiceManager.getService("PrivacyImpact"));
-            if( intent != null &&
-                intent.getComponent() != null &&
-                pis.isPrivacyImpactEnabled() &&
-                pis.showPackagePrivacy(intent.getComponent().getPackageName())) {
-                    Log.i(TAG_TIMELINE, "Timeline: Activity_first_launch "+
-                        intent.getComponent().getPackageName() + " time:"
-                        + SystemClock.uptimeMillis());
-                    // create the new intent
-                    Intent privacyIntent = new Intent();
-                    privacyIntent.setComponent(new ComponentName(PRIVACY_IMPACT_PACKAGE, PRIVACY_IMPACT_ACTIVITY));
-                    privacyIntent.putExtra("originalIntent", intent);
-                    privacyIntent.putExtra("originalOptions", options);
-                    privacyIntent.putExtra("originalRequestCode", requestCode);
-                    newIntent = privacyIntent;
-                }
-        } catch (Exception e) {
-            Log.e("ActivityManager", "Failed to wrap intent "+intent+" for PrivacyImpact", e);
-        }
-        return newIntent;
-    }
-
     public int startActivity(IApplicationThread caller, String callingPackage, Intent intent,
             String resolvedType, IBinder resultTo, String resultWho, int requestCode,
             int startFlags, ProfilerInfo profilerInfo, Bundle options) throws RemoteException {
@@ -2441,9 +2412,6 @@ class ActivityManagerProxy implements IActivityManager
             Log.i(TAG_TIMELINE, "Timeline: Activity_launch_request id:"
                 + intent.getComponent().getPackageName() + " time:"
                 + SystemClock.uptimeMillis());
-            if(callingPackage != null && !callingPackage.equals("com.fairphone.privacyimpact")){
-                intent = wrapPrivacyImpact(intent, options, requestCode);
-            }
         }
 
         data.writeInterfaceToken(IActivityManager.descriptor);
