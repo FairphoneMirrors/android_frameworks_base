@@ -1054,6 +1054,7 @@
     <string-array name="config_locationProviderPackageNames" translatable="false">
         <!-- The standard AOSP fused location provider -->
         <item>com.android.location.fused</item>
+        <item>com.google.android.gms</item>
     </string-array>
 
     <!-- This string array can be overriden to enable test location providers initially. -->
@@ -1621,7 +1622,7 @@
     <bool name="config_useDevInputEventForAudioJack">false</bool>
 
     <!-- Whether safe headphone volume is enabled or not (country specific). -->
-    <bool name="config_safe_media_volume_enabled">true</bool>
+    <bool name="config_safe_media_volume_enabled">false</bool>
 
     <!-- Set to true if the wifi display supports compositing content stored
          in gralloc protected buffers.  For this to be true, there must exist
