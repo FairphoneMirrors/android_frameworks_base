@@ -62,7 +62,6 @@ import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accounts.AccountManagerService;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.BatteryStatsService;
-import com.android.server.am.PrivacyImpactService;
 import com.android.server.clipboard.ClipboardService;
 import com.android.server.content.ContentService;
 import com.android.server.devicepolicy.DevicePolicyManagerService;
@@ -1014,13 +1013,6 @@ public final class SystemServer {
 
         if (!disableNonCoreServices) {
             mSystemServiceManager.startService(MediaProjectionManagerService.class);
-        }
-
-        try {
-            Slog.i(TAG, "PrivacyImpactService");
-            ServiceManager.addService( "PrivacyImpact", new PrivacyImpactService(context));
-        } catch (Throwable e) {
-            reportWtf("starting PrivacyImpactService", e);
         }
 
         // Before things start rolling, be sure we have decided whether

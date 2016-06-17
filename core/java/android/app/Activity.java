@@ -3984,7 +3984,6 @@ public class Activity extends ContextThemeWrapper
         this.startActivity(intent, null);
     }
 
-
     /**
      * Launch a new activity.  You will not receive any information about when
      * the activity exits.  This implementation overrides the base version,
