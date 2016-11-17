@@ -14,7 +14,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Calendar;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * Created by rrocha on 8/25/15.
@@ -29,12 +32,23 @@ public class FairphoneClockData
 	private static final String PREFERENCE_BATTERY_STATUS = "com.fairphone.clock.PREFERENCE_BATTERY_STATUS";
 	private static final String PREFERENCE_POM_CURRENT = "com.fairphone.clock.PREFERENCE_POM_CURRENT";
 	private static final String PREFERENCE_POM_RECORD = "com.fairphone.clock.PREFERENCE_POM_RECORD";
-	private static final String PREFERENCE_YOUR_FAIRPHONE_SINCE = "com.fairphone.clock.PREFERENCE_YOUR_FAIRPHONE_SINCE";
+	private static final String PREFERENCE_DEVICE_BIRTHDATE = "com.fairphone.clock.PREFERENCE_DEVICE_BIRTHDATE";
 	private static final String PREFERENCE_BATTERY_CHANGED_TIMESTAMP = "com.fairphone.clock.PREFERENCE_BATTERY_CHANGED_TIMESTAMP";
 	private static final String PREFERENCE_BATTERY_TIME_UNTIL_DISCHARGED = "com.fairphone.clock.PREFERENCE_BATTERY_TIME_UNTIL_DISCHARGED";
 	private static final String PREFERENCE_BATTERY_TIME_UNTIL_CHARGED = "com.fairphone.clock.PREFERENCE_BATTERY_TIME_UNTIL_CHARGED";
 
+	/*
+	 * Legacy preference that stored the board date and fell back to 2015-10-26 if no board date (prototype devices).
+	 *
+	 * private static final String PREFERENCE_YOUR_FAIRPHONE_SINCE = "com.fairphone.clock.PREFERENCE_YOUR_FAIRPHONE_SINCE";
+	 */
+
 	public static final String VIEW_UPDATE = "com.fairphone.fairphoneclock.UPDATE";
+
+	private static final String BOARD_DATE_FORMAT = "yyyyMMddhhmmss";
+	private static final String BOARD_DATE_TIMEZONE = "Asia/Shanghai";
+	/* Keep consistency and default to 2015-10-26. */
+	private static final long DEFAULT_BOARD_DATE_TIMESTAMP = 1445817600L;
 
 	private static SharedPreferences getSharedPrefs(Context context)
 	{
@@ -111,24 +125,21 @@ public class FairphoneClockData
 		getSharedPrefs(context).edit().putInt(PREFERENCE_ACTIVE_LAYOUT, value).commit();
 	}
 
-	public static long getFairphoneSince(Context context)
+	public static long getDeviceBirthdate(Context context)
 	{
-		long startTime = getSharedPrefs(context).getLong(PREFERENCE_YOUR_FAIRPHONE_SINCE, 0);
+		long birthdate = getSharedPrefs(context).getLong(PREFERENCE_DEVICE_BIRTHDATE, 0L);
 
-		byte[] boardFile = getBoardDateFileInByteArray();
+		if (birthdate == 0L) {
+			birthdate = readBoardDate();
+			setDeviceBirthdate(context, birthdate);
+		}
 
-        if(!byteArrayCheck(boardFile))
-        {
-            String strDate = bytesToHex(boardFile);
-        	startTime = getStartTimeInMilliseconds(strDate, startTime);
-        }
-
-		return startTime;
+		return birthdate;
 	}
 
-	public static void setFairphoneSince(Context context, long value)
+	public static void setDeviceBirthdate(Context context, long value)
 	{
-		getSharedPrefs(context).edit().putLong(PREFERENCE_YOUR_FAIRPHONE_SINCE, value).commit();
+		getSharedPrefs(context).edit().putLong(PREFERENCE_DEVICE_BIRTHDATE, value).commit();
 	}
 
     private static IBatteryStats sBatteryInfo = IBatteryStats.Stub.asInterface(ServiceManager.getService(BatteryStats.SERVICE_NAME));
@@ -143,7 +154,7 @@ public class FairphoneClockData
 			}
 			long batteryTimeRemaining = sBatteryInfo.computeBatteryTimeRemaining();
 			if (batteryTimeRemaining >= 0) {
-				setBatteryTimeUntilDischarged(context.getApplicationContext(), batteryTimeRemaining);	
+				setBatteryTimeUntilDischarged(context.getApplicationContext(), batteryTimeRemaining);
 			}
 	        Log.d(TAG, "updateBatteryPreferences setBatteryTimeUntilCharged "+chargeTimeRemaining);
 	        Log.d(TAG, "updateBatteryPreferences setBatteryTimeUntilDischarged "+batteryTimeRemaining);
@@ -172,59 +183,53 @@ public class FairphoneClockData
 		context.sendBroadcast(new Intent(VIEW_UPDATE));
 	}
 
-	private static byte[] getBoardDateFileInByteArray()
-	{
-        File file = new File(BOARD_DATE_FILE);
-        byte[] fileData = new byte[(int) file.length()];
-        DataInputStream dis = null;
-        try {
-            dis = new DataInputStream(new FileInputStream(file));
-            dis.read(fileData);
-            dis.close();
-        } catch (FileNotFoundException e) {
-            Log.e(TAG,"BoardDateFile not found", e);
-        } catch (IOException e) {
-            Log.e(TAG, "BoardDateFile IOException", e);
-        }
-        finally {
-            return fileData;
-        }
-    }
+    private static long readBoardDate() {
+		long boardDate = 0;
 
-    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
-    public static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for ( int j = 0; j < bytes.length; j++ ) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = hexArray[v >>> 4];
-            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-        }
-        return new String(hexChars);
-    }
-	private static boolean byteArrayCheck(final byte[] array) {
-        int sum = 0;
-        for (byte b : array) {
-            sum |= b;
-        }
-        return (sum == 0);
-    }
+		try {
+			final byte[] boardFile = getBoardDateFileInByteArray();
+			final String strDate = bytesToHex(boardFile);
+			final SimpleDateFormat format = new SimpleDateFormat(BOARD_DATE_FORMAT, Locale.US);
 
-    private static long getStartTimeInMilliseconds(String date, long sharePrefTime)
-	{
-        Calendar cal = Calendar.getInstance();
+			format.setTimeZone(TimeZone.getTimeZone(BOARD_DATE_TIMEZONE));
+			boardDate = format.parse(strDate.substring(0,14)).getTime();
+		} catch (Exception e) {
+			Log.e(TAG, "Unknown error while reading board date; using default", e);
+			boardDate = DEFAULT_BOARD_DATE_TIMESTAMP;
+		}
 
-        try {
-            cal.set(Calendar.YEAR, Integer.parseInt(date.substring(0, 4)));
-            cal.set(Calendar.MONTH, Integer.parseInt(date.substring(4, 6)));
-            cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(date.substring(6, 8)));
-            cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(date.substring(8, 10)));
-            cal.set(Calendar.MINUTE, Integer.parseInt(date.substring(10, 12)));
-            cal.set(Calendar.SECOND, Integer.parseInt(date.substring(12, 14)));
-        }
-        catch (NumberFormatException e) {
-            Log.e(TAG, "Parse Exception", e);
-			return sharePrefTime;
-        }
-		return cal.getTimeInMillis();
-    }
+		return boardDate;
+	}
+
+	private static byte[] getBoardDateFileInByteArray() {
+		final File file = new File(BOARD_DATE_FILE);
+		final byte[] fileData = new byte[(int) file.length()];
+		DataInputStream dis = null;
+
+		try {
+			dis = new DataInputStream(new FileInputStream(file));
+			dis.read(fileData);
+			dis.close();
+		} catch (FileNotFoundException e) {
+			Log.e(TAG,"BoardDateFile not found", e);
+		} catch (IOException e) {
+			Log.e(TAG, "BoardDateFile IOException", e);
+		}
+		finally {
+			return fileData;
+		}
+	}
+
+	private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
+	private static String bytesToHex(byte[] bytes) {
+		final char[] hexChars = new char[bytes.length * 2];
+
+		for (int j = 0; j < bytes.length; j++) {
+			int v = bytes[j] & 0xFF;
+			hexChars[j * 2] = hexArray[v >>> 4];
+			hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+		}
+
+		return new String(hexChars);
+	}
 }

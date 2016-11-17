@@ -38,13 +38,13 @@ import java.util.concurrent.TimeUnit;
 public class FairphoneClockView extends LinearLayout
 {
 	private static final String TAG = FairphoneClockView.class.getSimpleName();
-	private static final String BOARD_DATE_FILE = "/persist/board_date.bin";
+
 	private ViewGroup[] CLOCK_WIDGET_VIEWS = null;
 
 	private TextView mAmPmText, mAlarmText, mBatteryDaysLeft, mBatteryAmPmIndicator, mHoursText,
 			mMinutesText, mBatteryDescriptionText, mPomCurrentText, mPomRecordText, mElapsedYearsText,
 			mYearsText, mElapsedMonthsText, mMonthsText, mElapsedDaysText, mDaysText;
-	private View mDayIndicator, mBatteryTimeGroup, mLastLongerButton, mChargedText, mUnplugChargerText;
+	private View mDayIndicator, mBatteryTimeGroup, mLastLongerButton, mYoursSinceShareButton, mChargedText, mUnplugChargerText;
 	private ImageView mBatteryLevelImage;
 	private BroadcastReceiver mReceiver;
 	private Runnable onDismissRunnable;
@@ -120,7 +120,7 @@ public class FairphoneClockView extends LinearLayout
 				shareText = getPeaceOfMindShareText();
 			}
 			else if (active_layout == R.id.clock_widget_yours_since) {
-				shareText = getYourFairphoneSinceShareText();
+				shareText = getYourFairphoneForShareText();
 			}
 			else {
 				Log.w(TAG, "Unknown Share button: " + active_layout);
@@ -144,7 +144,7 @@ public class FairphoneClockView extends LinearLayout
 					public void run(){
 						UserHandle user = new UserHandle(UserHandle.USER_CURRENT);
 						getContext().startActivityAsUser(mIntent, null, user);
-					}	
+					}
 				}.setup(sendIntent);
 			}
 		}
@@ -166,7 +166,7 @@ public class FairphoneClockView extends LinearLayout
 		return shareText;
 	}
 
-	private String getYourFairphoneSinceShareText()
+	private String getYourFairphoneForShareText()
 	{
 		Resources resources = getResources();
 		Period p = getPeriod();
@@ -314,11 +314,12 @@ public class FairphoneClockView extends LinearLayout
 		mMonthsText = (TextView) mRootView.findViewById(R.id.months_text);
 		mElapsedDaysText = (TextView) mRootView.findViewById(R.id.eleapsed_days_text);
 		mDaysText = (TextView) mRootView.findViewById(R.id.days_text);
+		mYoursSinceShareButton = mRootView.findViewById(R.id.yours_since_share_button);
 
 		mRootView.findViewById(R.id.clock_edit_button).setOnClickListener(editClickListener);
 
 		mRootView.findViewById(R.id.peace_share_button).setOnClickListener(shareClickListener);
-		mRootView.findViewById(R.id.yours_since_share_button).setOnClickListener(shareClickListener);
+		mYoursSinceShareButton.setOnClickListener(shareClickListener);
 		mLastLongerButton.setOnClickListener(new OnClickListener()
 		{
 			@Override
@@ -362,7 +363,7 @@ public class FairphoneClockView extends LinearLayout
 		} else if (active_layout == R.id.clock_widget_battery) {
 			setupBatteryLayout();
 		} else if (active_layout == R.id.clock_widget_yours_since) {
-			setYourFairphoneSince();
+			setYourFairphoneFor();
 		} else {
 			Log.e(TAG, "Unknown layout: " + active_layout);
 		}
@@ -613,12 +614,19 @@ public class FairphoneClockView extends LinearLayout
 //
 
 
-	private void setYourFairphoneSince()
+	private void setYourFairphoneFor()
 	{
 		Resources resources = getResources();
 		Period p = getPeriod();
 
-		if (p.diffYears != 0)
+		// Show the share button if there is a period to display
+		mYoursSinceShareButton.setVisibility((null == p) ? View.INVISIBLE : View.VISIBLE);
+
+		if (null == p)
+		{
+			// TODO display an informative message about the fact that the device age is unknown
+		}
+		else if (p.diffYears != 0)
 		{
 			mElapsedYearsText.setText(String.format("%02d", p.diffYears));
 			mYearsText.setText(p.diffYears == 1 ? resources.getString(R.string.year) : resources.getString(R.string.years));
@@ -648,43 +656,43 @@ public class FairphoneClockView extends LinearLayout
 	}
 
 	private Period getPeriod() {
-		Period p = new Period();
-		long startTime = FairphoneClockData.getFairphoneSince(getContext());
-		if (startTime == 0L)
-		{	
-			Calendar cal = Calendar.getInstance();
-        		cal.set(2015, Calendar.OCTOBER, 26);
-			startTime = cal.getTimeInMillis();
-			FairphoneClockData.setFairphoneSince(getContext(),startTime);
-		}
-		Calendar start = Calendar.getInstance();
-		start.setTimeInMillis(startTime);
 		Calendar now = Calendar.getInstance();
+		Period p = null;
+		long deviceBirthdate = FairphoneClockData.getDeviceBirthdate(getContext());
 
-		p.diffHours = now.get(Calendar.HOUR_OF_DAY)-start.get(Calendar.HOUR_OF_DAY);
+		// If the birthdate is in the future, the period stays null
 
-		p.diffMonthDays = now.get(Calendar.DAY_OF_MONTH)-start.get(Calendar.DAY_OF_MONTH);
-		if (p.diffHours < 0) {
-			p.diffMonthDays -= 1;
-			p.diffHours = 24 + p.diffHours;
+		if (now.getTimeInMillis() >= deviceBirthdate) {
+			p = new Period();
+
+			Calendar start = Calendar.getInstance();
+			start.setTimeInMillis(deviceBirthdate);
+
+			p.diffHours = now.get(Calendar.HOUR_OF_DAY)-start.get(Calendar.HOUR_OF_DAY);
+
+			p.diffMonthDays = now.get(Calendar.DAY_OF_MONTH)-start.get(Calendar.DAY_OF_MONTH);
+			if (p.diffHours < 0) {
+				p.diffMonthDays -= 1;
+				p.diffHours = 24 + p.diffHours;
+			}
+
+			p.diffMonths = now.get(Calendar.MONTH)-start.get(Calendar.MONTH);
+			if (p.diffMonthDays < 0){
+				p.diffMonths -= 1;
+				Calendar c = Calendar.getInstance();
+				c.set(now.get(Calendar.YEAR), now.get(Calendar.MONTH), 0);
+				p.diffMonthDays = c.get(Calendar.DAY_OF_MONTH) + p.diffMonthDays;
+			}
+
+			p.diffYears = now.get(Calendar.YEAR)-start.get(Calendar.YEAR);
+			if (p.diffMonths < 0) {
+				p.diffYears -= 1;
+				p.diffMonths = 12 + p.diffMonths;
+			}
+
+			p.diffWeeks = p.diffMonthDays / 7;
+			p.diffMonthWeekDays = p.diffMonthDays % 7;
 		}
-
-		p.diffMonths = now.get(Calendar.MONTH)-start.get(Calendar.MONTH);
-		if (p.diffMonthDays < 0){
-			p.diffMonths -= 1;
-			Calendar c = Calendar.getInstance();
-			c.set(now.get(Calendar.YEAR), now.get(Calendar.MONTH), 0);
-			p.diffMonthDays = c.get(Calendar.DAY_OF_MONTH) + p.diffMonthDays;
-		}
-
-		p.diffYears = now.get(Calendar.YEAR)-start.get(Calendar.YEAR);
-		if (p.diffMonths < 0) {
-			p.diffYears -= 1;
-			p.diffMonths = 12 + p.diffMonths;
-		}
-
-		p.diffWeeks = p.diffMonthDays / 7;
-		p.diffMonthWeekDays = p.diffMonthDays % 7;
 
 		return p;
 	}
