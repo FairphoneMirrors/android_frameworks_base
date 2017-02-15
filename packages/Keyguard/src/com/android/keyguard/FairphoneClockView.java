@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 public class FairphoneClockView extends LinearLayout
 {
 	private static final String TAG = FairphoneClockView.class.getSimpleName();
+	private static final boolean DBG = false;
 
 	private ViewGroup[] CLOCK_WIDGET_VIEWS = null;
 
@@ -55,10 +56,12 @@ public class FairphoneClockView extends LinearLayout
 		@Override
 		public void onClick(View v)
 		{
-			FairphoneClockData.getCurrentLayoutIdx(getContext());
-			int currentLayoutIdx = (1 + FairphoneClockData.getCurrentLayoutIdx(getContext())) % CLOCK_WIDGET_VIEWS.length;
-			FairphoneClockData.setCurrentLayoutIdx(getContext(), currentLayoutIdx);
-			update(currentLayoutIdx);
+			final int currentLayoutIdx = FairphoneClockData.getCurrentLayoutIdx(getContext());
+			final int actualLayoutIdx = update((currentLayoutIdx + 1) % CLOCK_WIDGET_LAYOUTS.length);
+
+			if (currentLayoutIdx != actualLayoutIdx) {
+				FairphoneClockData.setCurrentLayoutIdx(getContext(), actualLayoutIdx);
+			}
 		}
 	};
 
@@ -334,14 +337,41 @@ public class FairphoneClockView extends LinearLayout
 
 	public void update()
 	{
-		int currentLayoutIdx = FairphoneClockData.getCurrentLayoutIdx(getContext());
-		update(currentLayoutIdx);
+		final int currentLayoutIdx = FairphoneClockData.getCurrentLayoutIdx(getContext());
+		final int actualLayoutIdx = update(currentLayoutIdx);
+
+		if (actualLayoutIdx != currentLayoutIdx) {
+			FairphoneClockData.setCurrentLayoutIdx(getContext(), actualLayoutIdx);
+		}
 	}
 
-	private void update(int currentLayoutIdx)
+	private int update(int layoutIdx)
 	{
-		makeViewgroupVisible(CLOCK_WIDGET_VIEWS[currentLayoutIdx]);
-		setupActiveView(currentLayoutIdx);
+		if (DBG) Log.d(TAG, "update: currentLayoutIdx=" + FairphoneClockData.getCurrentLayoutIdx(getContext()) + " layoutIdx=" + layoutIdx + " of " + CLOCK_WIDGET_LAYOUTS.length);
+
+		// Skip the "Your Fairphone for" layout if the device age is negative
+		if (CLOCK_WIDGET_LAYOUTS.length > 1
+				&& CLOCK_WIDGET_LAYOUTS.length > layoutIdx
+				&& CLOCK_WIDGET_LAYOUTS[layoutIdx] == R.id.clock_widget_yours_since) {
+			final Calendar now = Calendar.getInstance();
+			final long deviceBirthdate = FairphoneClockData.getDeviceBirthdate(getContext());
+
+			if (DBG) Log.d(TAG, "update: now=" + now.getTimeInMillis() + " vs deviceBirthdate=" + deviceBirthdate);
+
+			// If the birthdate is in the future, go to the next layout available
+			if (now.getTimeInMillis() < deviceBirthdate) {
+				layoutIdx = (layoutIdx + 1) % CLOCK_WIDGET_LAYOUTS.length;
+
+				if (DBG) Log.d(TAG, "update: 'Your Fairphone for' was skipped, layoutIdx=" + layoutIdx);
+			} else {
+				if (DBG) Log.d(TAG, "update: 'Your Fairphone for' was not skipped");
+			}
+		}
+
+		makeViewgroupVisible(CLOCK_WIDGET_VIEWS[layoutIdx]);
+		setupActiveView(layoutIdx);
+
+		return layoutIdx;
 	}
 
 	private void makeViewgroupVisible(ViewGroup viewGroup)
